@@ -29,11 +29,13 @@ class Settings:
     invert_steer: bool = False
     show_steer: bool = True
     wheel_style: str = "formula"  # formula, sport, classic
+    safe_inset: int = 16  # inner padding around the overlay content, in pixels
     info_position: str = "top"  # top, bottom
     language: str = "ru"  # ru, en
     steering_lock_deg: int = 540  # total lock-to-lock rotation of the wheel icon
     show_speed: bool = True
     show_gear: bool = True
+    show_pedal_values: bool = True
     x: int | None = None
     y: int | None = None
 
@@ -65,6 +67,7 @@ class Settings:
         self.smoothing_ms = max(0, min(200, int(self.smoothing_ms)))
         self.opacity = max(35, min(100, int(self.opacity)))
         self.steering_lock_deg = max(180, min(1080, int(self.steering_lock_deg)))
+        self.safe_inset = max(8, min(30, int(self.safe_inset)))
         if self.source not in ("acc", "controller", "demo"):
             self.source = "acc"
         if self.wheel_style not in ("formula", "sport", "classic"):

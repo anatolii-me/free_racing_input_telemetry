@@ -9,13 +9,14 @@ from tempfile import TemporaryDirectory
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtCore import QPoint, QRectF, Qt  # noqa: E402
+from PySide6.QtCore import QPoint, Qt  # noqa: E402
 from PySide6.QtTest import QTest  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
 from acc_trace.config import Settings  # noqa: E402
 from acc_trace.controller import ControllerReader  # noqa: E402
 from acc_trace.i18n import status_label  # noqa: E402
+from acc_trace.layout import build_layout  # noqa: E402
 from acc_trace.overlay import Overlay  # noqa: E402
 from acc_trace.settings_dialog import SettingsDialog  # noqa: E402
 from acc_trace.telemetry import Telemetry  # noqa: E402
@@ -36,8 +37,8 @@ class OverlayRenderingTests(unittest.TestCase):
             for i in range(211)
         )
         image = overlay.grab().toImage()
-        gas = image.pixelColor(300, 122)
-        brake = image.pixelColor(300, 128)
+        gas = image.pixelColor(345, 137)
+        brake = image.pixelColor(345, 144)
         self.assertGreater(gas.green(), gas.red() + 40)
         self.assertGreater(brake.red(), brake.green() + 40)
         overlay.close()
@@ -74,7 +75,7 @@ class OverlayRenderingTests(unittest.TestCase):
         overlay = Overlay(Settings(source="demo"))
         overlay.timer.stop()
         overlay._history = deque(((0.0, .5, .5), (1.0, .5, .5)))
-        chart = QRectF(244, 32, 390, 100)
+        chart = overlay._layout.chart
         gas, brake = overlay._trace_paths(chart, 1.0)
         self.assertEqual(gas.elementAt(0).y, brake.elementAt(0).y)
         overlay.settings.avoid_trace_overlap = True
@@ -83,7 +84,8 @@ class OverlayRenderingTests(unittest.TestCase):
         overlay.close()
 
     def test_info_controls_move_together_and_save(self) -> None:
-        settings = Settings(info_position="bottom", wheel_style="classic", language="en")
+        settings = Settings(info_position="bottom", wheel_style="classic", language="en",
+                            safe_inset=24, show_pedal_values=False)
         overlay = Overlay(settings)
         overlay.timer.stop()
         settings_rect, close_rect = overlay._controls()
@@ -102,19 +104,90 @@ class OverlayRenderingTests(unittest.TestCase):
             self.assertEqual(Settings.load(path).wheel_style, "classic")
             self.assertEqual(Settings.load(path).info_position, "bottom")
             self.assertEqual(Settings.load(path).language, "en")
+            self.assertEqual(Settings.load(path).safe_inset, 24)
+            self.assertFalse(Settings.load(path).show_pedal_values)
 
     def test_settings_dialog_saves_new_choices(self) -> None:
         dialog = SettingsDialog(Settings(), ControllerReader())
         dialog.wheel_combo.setCurrentIndex(dialog.wheel_combo.findData("sport"))
         dialog.info_combo.setCurrentIndex(dialog.info_combo.findData("bottom"))
         dialog.language_combo.setCurrentIndex(dialog.language_combo.findData("en"))
+        dialog.safe_slider.setValue(24)
         dialog.avoid_trace_overlap.setChecked(True)
+        dialog.show_pedal_values.setChecked(False)
         dialog._accept()
         self.assertEqual((dialog.result_settings.wheel_style,
                           dialog.result_settings.info_position,
                           dialog.result_settings.language), ("sport", "bottom", "en"))
         self.assertTrue(dialog.result_settings.avoid_trace_overlap)
+        self.assertEqual(dialog.result_settings.safe_inset, 24)
+        self.assertFalse(dialog.result_settings.show_pedal_values)
         dialog.close()
+
+    def test_safe_area_and_separators_share_one_spacing_rule(self) -> None:
+        self.assertGreater(build_layout(Settings(safe_inset=8)).wheel_size,
+                           build_layout(Settings(safe_inset=30)).wheel_size)
+        for inset in (8, 16, 30):
+            layout = build_layout(Settings(safe_inset=inset))
+            self.assertEqual(layout.safe.left(), inset)
+            self.assertEqual(layout.width - layout.safe.right(), inset)
+            self.assertEqual(layout.safe.top(), inset)
+            self.assertEqual(layout.height - layout.safe.bottom(), inset)
+            sections = [layout.wheel, layout.drive, layout.chart_column, layout.pedals]
+            for left, divider, right in zip(sections, layout.dividers, sections[1:]):
+                self.assertEqual(divider - left.right(), 10)
+                self.assertEqual(right.left() - divider, 10)
+            self.assertEqual(layout.pedals.right(), layout.safe.right())
+            self.assertEqual(layout.gas_track.top(), layout.safe.top())
+            self.assertEqual(layout.brake_track.bottom(), layout.safe.bottom())
+            self.assertEqual(layout.wheel.center().y(), layout.safe.center().y())
+            self.assertEqual(layout.chart.bottom(), layout.safe.bottom())
+            bottom = build_layout(Settings(safe_inset=inset, info_position="bottom"))
+            self.assertEqual(bottom.chart.top(), bottom.safe.top())
+
+    def test_hidden_inputs_shrink_window_and_remove_unused_dividers(self) -> None:
+        overlay = Overlay(Settings(source="demo"))
+        overlay.timer.stop()
+        full_width = overlay.width()
+        graph_width = overlay._layout.chart.width()
+        self.assertEqual(len(overlay._layout.dividers), 3)
+        overlay.apply_settings(Settings(source="demo", show_steer=False))
+        overlay.timer.stop()
+        self.assertLess(overlay.width(), full_width)
+        self.assertIsNone(overlay._layout.wheel)
+        self.assertEqual(len(overlay._layout.dividers), 2)
+        self.assertEqual(overlay._layout.chart.width(), graph_width)
+        overlay.apply_settings(Settings(source="demo", show_gear=False, show_speed=False))
+        overlay.timer.stop()
+        self.assertLess(overlay.width(), full_width)
+        self.assertIsNone(overlay._layout.drive)
+        self.assertEqual(len(overlay._layout.dividers), 2)
+        overlay.apply_settings(Settings(source="demo", show_gear=False))
+        overlay.timer.stop()
+        self.assertLess(overlay.width(), full_width)
+        self.assertIsNotNone(overlay._layout.drive)
+        overlay.close()
+
+    def test_pedal_value_badges_can_be_hidden_without_changing_bars(self) -> None:
+        overlay = Overlay(Settings(source="demo"))
+        overlay.timer.stop()
+        overlay.current = Telemetry(.63, .28, 0, 120, 4, True, "PREVIEW", True)
+        with_values = overlay.grab().toImage()
+        gas_track = overlay._layout.gas_track
+        overlay.apply_settings(Settings(source="demo", show_pedal_values=False))
+        overlay.timer.stop()
+        without_values = overlay.grab().toImage()
+        center_x = round(gas_track.center().x())
+        center_y = round(gas_track.center().y())
+        badge_changed = sum(
+            with_values.pixelColor(x, y) != without_values.pixelColor(x, y)
+            for x in range(center_x - 12, center_x + 12)
+            for y in range(center_y - 9, center_y + 9)
+        )
+        self.assertGreater(badge_changed, 40)
+        self.assertEqual(with_values.pixelColor(center_x, round(gas_track.bottom() - 7)),
+                         without_values.pixelColor(center_x, round(gas_track.bottom() - 7)))
+        overlay.close()
 
     def test_english_settings_and_status(self) -> None:
         dialog = SettingsDialog(Settings(language="en"), ControllerReader())

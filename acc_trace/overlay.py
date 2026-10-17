@@ -12,6 +12,7 @@ from .config import Settings
 from .telemetry import AccReader, DemoReader, Telemetry
 from .controller import ControllerReader
 from .i18n import status_label, tr
+from .layout import OverlayLayout, build_layout
 from .wheels import draw_wheel
 
 
@@ -86,6 +87,8 @@ class Overlay(QWidget):
     def apply_settings(self, settings: Settings) -> None:
         previous_source = getattr(self, "settings", settings).source
         self.settings = settings
+        self._layout: OverlayLayout = build_layout(settings)
+        self.setFixedSize(self._layout.width, self._layout.height)
         self._hover_settings = self._hover_close = False
         self.setWindowOpacity(settings.opacity / 100)
         if settings.source != previous_source:
@@ -114,7 +117,7 @@ class Overlay(QWidget):
         else:
             self._history.clear()
             self._smooth_gas = self._smooth_brake = 0.0
-        max_age = 377 / self.settings.graph_speed + .2
+        max_age = (self._layout.chart.width() - 13) / self.settings.graph_speed + .2
         while self._history and now - self._history[0][0] > max_age:
             self._history.popleft()
         self.update()  # polling frequency and paint FPS share one timer
@@ -140,44 +143,78 @@ class Overlay(QWidget):
         p.setPen(color)
         p.drawText(rect, Qt.AlignHCenter | Qt.AlignVCenter, text)
 
+    def _edge_text(self, p: QPainter, text: str, center_x: float, edge_y: float,
+                   *, top: bool, size: int, color: QColor, weight: QFont.Weight) -> None:
+        p.setFont(font(size, weight))
+        p.setPen(color)
+        bounds = QFontMetrics(p.font()).tightBoundingRect(text)
+        x = center_x - bounds.left() - bounds.width() / 2
+        y = edge_y - (bounds.top() if top else bounds.bottom())
+        p.drawText(QPoint(round(x), round(y)), text)
+
+    def _tight_center_text(self, p: QPainter, text: str, center_x: float, center_y: float,
+                           size: int, color: QColor, weight: QFont.Weight) -> None:
+        p.setFont(font(size, weight))
+        p.setPen(color)
+        bounds = QFontMetrics(p.font()).tightBoundingRect(text)
+        x = center_x - bounds.left() - bounds.width() / 2
+        y = center_y - bounds.top() - bounds.height() / 2
+        p.drawText(QPoint(round(x), round(y)), text)
+
     def _info_y(self) -> float:
-        return 20 if self.settings.info_position == "top" else 144
+        return self._layout.rail_y
 
     def _controls(self) -> tuple[QRectF, QRectF]:
-        y = self._info_y() - 10
-        return QRectF(590, y, 21, 20), QRectF(615, y, 21, 20)
+        return self._layout.settings_button, self._layout.close_button
 
     def paintEvent(self, event) -> None:  # noqa: N802
+        layout = self._layout
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
         p.setRenderHint(QPainter.TextAntialiasing)
         p.setPen(Qt.NoPen)
         p.setBrush(QColor(0, 0, 0, 38))
-        p.drawRoundedRect(QRectF(2, 4, 786, 158), 19, 19)
+        p.drawRoundedRect(QRectF(2, 4, self.width() - 4, self.height() - 6), 19, 19)
         p.setBrush(BG)
         p.setPen(QPen(QColor("#354352"), 1))
-        p.drawRoundedRect(QRectF(2, 2, 786, 158), 18, 18)
+        p.drawRoundedRect(QRectF(2, 2, self.width() - 4, self.height() - 6), 18, 18)
 
         p.setPen(QPen(QColor("#2b3947"), 1))
-        for x in (132, 229, 642):
-            p.drawLine(QPoint(x, 21), QPoint(x, 143))
+        for x in layout.dividers:
+            p.drawLine(QPoint(round(x), round(layout.safe.top() + 4)),
+                       QPoint(round(x), round(layout.safe.bottom() - 4)))
 
-        if self.settings.show_steer:
-            draw_wheel(p, self.settings.wheel_style, 70, self.height() / 2,
-                       98, (self.current.steer if self.current.connected else 0)
+        if layout.wheel is not None:
+            draw_wheel(p, self.settings.wheel_style,
+                       layout.wheel.center().x(), layout.wheel.center().y(),
+                       layout.wheel_size, (self.current.steer if self.current.connected else 0)
                        * self.settings.steering_lock_deg / 2)
-        if self.settings.show_gear:
-            gear = "—" if not self.current.vehicle_available else "R" if self.current.gear == 0 else "N" if self.current.gear == 1 else str(self.current.gear - 1)
-            self._center_text(p, gear, QRectF(143, 24, 75, 50), 41, TEXT, QFont.Bold)
-        if self.settings.show_speed:
-            speed = "—" if not self.current.vehicle_available else str(round(self.current.speed_kmh))
-            self._center_text(p, speed, QRectF(144, 94, 73, 28), 22, TEXT, QFont.DemiBold)
-            self._center_text(p, tr(self.settings.language, "kmh"),
-                              QRectF(143, 124, 75, 16), 8, MUTED, QFont.DemiBold)
-        p.setPen(QPen(QColor("#526273"), 1))
-        p.drawLine(154, self.height() // 2, 207, self.height() // 2)
+        if layout.drive is not None:
+            drive = layout.drive
+            middle = layout.safe.center().y()
+            both = self.settings.show_gear and self.settings.show_speed
+            if self.settings.show_gear:
+                gear = "—" if not self.current.vehicle_available else "R" if self.current.gear == 0 else "N" if self.current.gear == 1 else str(self.current.gear - 1)
+                center_y = (layout.safe.top() + middle) / 2 if both else middle
+                self._tight_center_text(p, gear, drive.center().x(), center_y,
+                                        41, TEXT, QFont.Bold)
+            if self.settings.show_speed:
+                speed = "—" if not self.current.vehicle_available else str(round(self.current.speed_kmh))
+                unit = tr(self.settings.language, "kmh")
+                speed_height = QFontMetrics(font(22, QFont.DemiBold)).tightBoundingRect(speed).height()
+                unit_height = QFontMetrics(font(8, QFont.DemiBold)).tightBoundingRect(unit).height()
+                center_y = (middle + layout.safe.bottom()) / 2 if both else middle
+                group_top = center_y - (speed_height + 4 + unit_height) / 2
+                self._edge_text(p, speed, drive.center().x(), group_top,
+                                top=True, size=22, color=TEXT, weight=QFont.DemiBold)
+                self._edge_text(p, unit, drive.center().x(), group_top + speed_height + 4,
+                                top=True, size=8, color=MUTED, weight=QFont.DemiBold)
+            if both:
+                p.setPen(QPen(QColor("#526273"), 1))
+                p.drawLine(QPoint(round(drive.left() + 10), round(middle)),
+                           QPoint(round(drive.right() - 10), round(middle)))
 
-        chart = QRectF(244, 32, 390, 100)
+        chart = layout.chart
         p.setPen(Qt.NoPen)
         p.setBrush(QColor("#172432"))
         p.drawRoundedRect(chart, 9, 9)
@@ -189,7 +226,8 @@ class Overlay(QWidget):
         for level in (.25, .5, .75):
             y = chart.bottom() - 7 - level * (chart.height() - 14)
             p.drawLine(QPoint(round(chart.left()), round(y)), QPoint(round(chart.right()), round(y)))
-        for x in (chart.right() - 95, chart.right() - 190, chart.right() - 285):
+        for fraction in (.25, .5, .75):
+            x = chart.left() + chart.width() * fraction
             p.drawLine(QPoint(round(x), round(chart.top())), QPoint(round(x), round(chart.bottom())))
         if len(self._history) > 1:
             gas_path, brake_path = self._trace_paths(chart, time.monotonic())
@@ -203,31 +241,32 @@ class Overlay(QWidget):
             for path, color in ((gas_path, GAS), (brake_path, BRAKE)):
                 p.strokePath(path, QPen(color, 2.2, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
         p.restore()
-        self._draw_bar(p, 662, self.current.gas if self.current.connected else 0, GAS)
-        self._draw_bar(p, 718, self.current.brake if self.current.connected else 0, BRAKE)
+        self._draw_bar(p, layout.gas_track, self.current.gas if self.current.connected else 0, GAS)
+        self._draw_bar(p, layout.brake_track, self.current.brake if self.current.connected else 0, BRAKE)
         self._draw_info_rail(p)
         p.end()
 
     def _draw_info_rail(self, p: QPainter) -> None:
+        left = self._layout.chart_column.left()
         y = self._info_y()
         status_color = GAS if self.current.connected else MUTED
         p.setPen(Qt.NoPen)
         p.setBrush(status_color)
-        p.drawEllipse(QRectF(244, y - 3, 6, 6))
+        p.drawEllipse(QRectF(left, y - 3, 6, 6))
         p.setFont(font(8, QFont.DemiBold))
         p.setPen(QColor("#d6e0e9"))
         label = status_label(self.settings.language, self.current.label)
         label = QFontMetrics(p.font()).elidedText(label, Qt.ElideRight, 112)
-        p.drawText(QPoint(256, round(y + 4)), label)
+        p.drawText(QPoint(round(left + 12), round(y + 4)), label)
         p.setPen(Qt.NoPen)
         p.setBrush(GAS)
-        p.drawEllipse(QRectF(376, y - 3, 6, 6))
-        self._label(p, tr(self.settings.language, "gas").upper(), 386, y + 4, 8, GAS, QFont.DemiBold)
+        p.drawEllipse(QRectF(left + 132, y - 3, 6, 6))
+        self._label(p, tr(self.settings.language, "gas").upper(), left + 142, y + 4, 8, GAS, QFont.DemiBold)
         p.setBrush(BRAKE)
-        p.drawEllipse(QRectF(421, y - 3, 6, 6))
-        self._label(p, tr(self.settings.language, "brake").upper(), 431, y + 4, 8, BRAKE, QFont.DemiBold)
-        self._label(p, f"{self.settings.update_hz} FPS", 487, y + 4, 8, MUTED, QFont.DemiBold)
-        self._label(p, f"{self.settings.graph_speed} PX/S", 537, y + 4, 8, MUTED, QFont.DemiBold)
+        p.drawEllipse(QRectF(left + 180, y - 3, 6, 6))
+        self._label(p, tr(self.settings.language, "brake").upper(), left + 190, y + 4, 8, BRAKE, QFont.DemiBold)
+        self._label(p, f"{self.settings.update_hz} FPS", left + 248, y + 4, 8, MUTED, QFont.DemiBold)
+        self._label(p, f"{self.settings.graph_speed} PX/S", left + 297, y + 4, 8, MUTED, QFont.DemiBold)
         settings_rect, close_rect = self._controls()
         self._draw_control(p, settings_rect, "settings", self._hover_settings)
         self._draw_control(p, close_rect, "close", self._hover_close)
@@ -256,19 +295,24 @@ class Overlay(QWidget):
                 brake_path.lineTo(x, brake_y)
         return gas_path, brake_path
 
-    def _draw_bar(self, p: QPainter, x: float, value: float, color: QColor) -> None:
+    def _draw_bar(self, p: QPainter, track: QRectF, value: float, color: QColor) -> None:
         value = max(0, min(1, value))
-        self._center_text(p, f"{round(value * 100):02}", QRectF(x - 5, 16, 38, 18),
-                          10, TEXT, QFont.DemiBold)
-        track = QRectF(x, 37, 28, 110)
         p.setPen(Qt.NoPen)
         p.setBrush(QColor("#243242"))
         p.drawRoundedRect(track, 7, 7)
         if value > .01:
             height = max(5, (track.height() - 6) * value)
-            fill = QRectF(x + 3, track.bottom() - 3 - height, 22, height)
+            fill = QRectF(track.left() + 3, track.bottom() - 3 - height,
+                          track.width() - 6, height)
             p.setBrush(color)
             p.drawRoundedRect(fill, 4, 4)
+        if self.settings.show_pedal_values:
+            badge = QRectF(track.left() + 2, track.center().y() - 11, track.width() - 4, 22)
+            p.setPen(QPen(QColor(255, 255, 255, 35), .7))
+            p.setBrush(QColor(9, 21, 32, 190))
+            p.drawRoundedRect(badge, 5, 5)
+            self._center_text(p, f"{round(value * 100):02}", badge,
+                              9, TEXT, QFont.DemiBold)
 
     def _draw_control(self, p: QPainter, rect: QRectF, kind: str, hover: bool) -> None:
         if hover:

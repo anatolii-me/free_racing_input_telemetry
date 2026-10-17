@@ -86,6 +86,8 @@ class SettingsDialog(QDialog):
         for position in ("top", "bottom"):
             self.info_combo.addItem(self._t(position), position)
         self._choice_row(appearance_layout, self._t("info_position"), self.info_combo)
+        self.safe_slider, self.safe_value = self._slider(
+            appearance_layout, self._t("safe_inset"), 8, 30, "px")
         self.language_combo = QComboBox()
         self.language_combo.addItem("Русский", "ru")
         self.language_combo.addItem("English", "en")
@@ -157,6 +159,8 @@ class SettingsDialog(QDialog):
             checks.addWidget(check)
         checks.addStretch()
         visibility_layout.addLayout(checks)
+        self.show_pedal_values = QCheckBox(self._t("pedal_values"))
+        visibility_layout.addWidget(self.show_pedal_values)
         body.addWidget(visibility_card)
 
         footer = QHBoxLayout()
@@ -238,6 +242,7 @@ class SettingsDialog(QDialog):
         self._devices_scanned = False
         self.wheel_combo.setCurrentIndex(self.wheel_combo.findData(settings.wheel_style))
         self.info_combo.setCurrentIndex(self.info_combo.findData(settings.info_position))
+        self.safe_slider.setValue(settings.safe_inset)
         self.language_combo.setCurrentIndex(self.language_combo.findData(settings.language))
         self.speed_slider.setValue(settings.graph_speed)
         self.avoid_trace_overlap.setChecked(settings.avoid_trace_overlap)
@@ -262,6 +267,7 @@ class SettingsDialog(QDialog):
         self.show_steer.setChecked(settings.show_steer)
         self.show_speed.setChecked(settings.show_speed)
         self.show_gear.setChecked(settings.show_gear)
+        self.show_pedal_values.setChecked(settings.show_pedal_values)
         self._update_source()
 
     def _restore_defaults(self) -> None:
@@ -303,7 +309,9 @@ class SettingsDialog(QDialog):
             show_steer=self.show_steer.isChecked(),
             show_speed=self.show_speed.isChecked(),
             show_gear=self.show_gear.isChecked(),
+            show_pedal_values=self.show_pedal_values.isChecked(),
             wheel_style=self.wheel_combo.currentData(),
+            safe_inset=self.safe_slider.value(),
             info_position=self.info_combo.currentData(),
             language=self.language_combo.currentData(),
         )
