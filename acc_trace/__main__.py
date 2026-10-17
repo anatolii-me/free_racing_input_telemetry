@@ -8,6 +8,7 @@ from PySide6.QtGui import QGuiApplication, QIcon
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
 from .config import Settings
+from .i18n import tr
 from .overlay import Overlay, paint_icon
 from .settings_dialog import SettingsDialog
 
@@ -19,16 +20,18 @@ class TraceApp:
         self.overlay = Overlay(settings)
         self.dialog: SettingsDialog | None = None
         self.overlay.settings_requested.connect(self.open_settings)
+        self.overlay.close_requested.connect(app.quit)
         self.overlay.position_changed.connect(self.save_position)
         self.tray = QSystemTrayIcon(QIcon(paint_icon()), app)
         menu = QMenu()
-        show_action = menu.addAction("Показать оверлей")
-        show_action.triggered.connect(self.show_overlay)
-        settings_action = menu.addAction("Настройки…")
-        settings_action.triggered.connect(self.open_settings)
+        self.show_action = menu.addAction("")
+        self.show_action.triggered.connect(self.show_overlay)
+        self.settings_action = menu.addAction("")
+        self.settings_action.triggered.connect(self.open_settings)
         menu.addSeparator()
-        quit_action = menu.addAction("Выход")
-        quit_action.triggered.connect(app.quit)
+        self.quit_action = menu.addAction("")
+        self.quit_action.triggered.connect(app.quit)
+        self._translate_menu()
         self.overlay.context_menu_requested.connect(menu.exec)
         self.tray.setContextMenu(menu)
         self.tray.setToolTip("ACC Trace")
@@ -58,6 +61,12 @@ class TraceApp:
         self.overlay.show()
         self.overlay.raise_()
 
+    def _translate_menu(self) -> None:
+        language = self.settings.language
+        self.show_action.setText(tr(language, "show_overlay"))
+        self.settings_action.setText(tr(language, "settings") + "…")
+        self.quit_action.setText(tr(language, "quit"))
+
     def save_position(self, x: int, y: int) -> None:
         self.settings.x = x
         self.settings.y = y
@@ -80,6 +89,7 @@ class TraceApp:
         self.settings = self.dialog.result_settings
         self.settings.save()
         self.overlay.apply_settings(self.settings)
+        self._translate_menu()
         self.dialog = None
 
 

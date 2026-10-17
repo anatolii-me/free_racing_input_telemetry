@@ -16,6 +16,7 @@ class Settings:
     # The render timer uses the same rate as the telemetry polling timer.
     update_hz: int = 60
     graph_speed: int = 95  # screen pixels per second
+    avoid_trace_overlap: bool = False
     smoothing_ms: int = 65
     opacity: int = 94  # percent, applied to the whole overlay
     source: str = "acc"  # acc, controller, demo
@@ -27,6 +28,9 @@ class Settings:
     invert_brake: bool = False
     invert_steer: bool = False
     show_steer: bool = True
+    wheel_style: str = "formula"  # formula, sport, classic
+    info_position: str = "top"  # top, bottom
+    language: str = "ru"  # ru, en
     steering_lock_deg: int = 540  # total lock-to-lock rotation of the wheel icon
     show_speed: bool = True
     show_gear: bool = True
@@ -63,6 +67,12 @@ class Settings:
         self.steering_lock_deg = max(180, min(1080, int(self.steering_lock_deg)))
         if self.source not in ("acc", "controller", "demo"):
             self.source = "acc"
+        if self.wheel_style not in ("formula", "sport", "classic"):
+            self.wheel_style = "formula"
+        if self.info_position not in ("top", "bottom"):
+            self.info_position = "top"
+        if self.language not in ("ru", "en"):
+            self.language = "ru"
         for name in ("gas_axis", "brake_axis", "steer_axis"):
             setattr(self, name, max(0, min(31, int(getattr(self, name)))))
 

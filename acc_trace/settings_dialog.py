@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
 
 from .config import Settings
 from .controller import AXIS_NAMES, ControllerReader
+from .i18n import tr
 
 
 STYLE = """
@@ -26,11 +27,13 @@ QPushButton:hover { background: #34495b; }
 QPushButton#primary { background: #83dfb1; border-color: #83dfb1; color: #102018; font-weight: 600; }
 QPushButton#primary:hover { background: #a0edc7; }
 QCheckBox { color: #dce5ef; spacing: 8px; }
-QCheckBox::indicator { width: 16px; height: 16px; }
+QCheckBox::indicator { width: 14px; height: 14px; background: #172534; border: 1px solid #53677a; border-radius: 3px; }
+QCheckBox::indicator:checked { background: #83dfb1; border-color: #83dfb1; }
 QSlider::groove:horizontal { height: 5px; border-radius: 2px; background: #34495b; }
 QSlider::sub-page:horizontal { background: #83dfb1; border-radius: 2px; }
 QSlider::handle:horizontal { background: #edf9f2; width: 15px; margin: -5px 0; border-radius: 7px; }
 QScrollArea { background: transparent; border: none; }
+QWidget#scrollContent { background: #121c28; }
 QScrollBar:vertical { width: 8px; background: transparent; }
 QScrollBar::handle:vertical { background: #41576a; border-radius: 4px; min-height: 28px; }
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
@@ -40,7 +43,8 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
 class SettingsDialog(QDialog):
     def __init__(self, settings: Settings, controller: ControllerReader, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Настройки · ACC Trace")
+        self.language = settings.language
+        self.setWindowTitle(self._t("settings_title"))
         self.setWindowFlag(Qt.WindowStaysOnTopHint)
         self.setModal(False)
         self.setMinimumWidth(540)
@@ -53,10 +57,10 @@ class SettingsDialog(QDialog):
         root = QVBoxLayout(self)
         root.setContentsMargins(24, 22, 24, 22)
         root.setSpacing(15)
-        title = QLabel("Настройки")
+        title = QLabel(self._t("settings"))
         title.setStyleSheet("font-size: 23px; font-weight: 600; color: #f6f9fc;")
         root.addWidget(title)
-        subtitle = QLabel("Настройте поведение оверлея под свой риг и монитор.")
+        subtitle = QLabel(self._t("subtitle"))
         subtitle.setObjectName("subtitle")
         root.addWidget(subtitle)
 
@@ -64,6 +68,7 @@ class SettingsDialog(QDialog):
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         content = QWidget()
+        content.setObjectName("scrollContent")
         body = QVBoxLayout(content)
         body.setContentsMargins(0, 3, 0, 3)
         body.setSpacing(15)
@@ -72,32 +77,48 @@ class SettingsDialog(QDialog):
         self._scroll = scroll
         self._content = content
 
-        display_card, display_layout = self._card("ОТОБРАЖЕНИЕ")
-        self.speed_slider, self.speed_value = self._slider(display_layout, "Скорость графика", 30, 180, "px/s")
-        self.smooth_slider, self.smooth_value = self._slider(display_layout, "Сглаживание", 0, 200, "мс")
-        self.opacity_slider, self.opacity_value = self._slider(display_layout, "Непрозрачность", 35, 100, "%")
-        self.steering_slider, self.steering_value = self._slider(display_layout, "Поворот руля от упора до упора", 180, 1080, "°")
+        appearance_card, appearance_layout = self._card(self._t("appearance"))
+        self.wheel_combo = QComboBox()
+        for style in ("formula", "sport", "classic"):
+            self.wheel_combo.addItem(self._t(style), style)
+        self._choice_row(appearance_layout, self._t("wheel_style"), self.wheel_combo)
+        self.info_combo = QComboBox()
+        for position in ("top", "bottom"):
+            self.info_combo.addItem(self._t(position), position)
+        self._choice_row(appearance_layout, self._t("info_position"), self.info_combo)
+        self.language_combo = QComboBox()
+        self.language_combo.addItem("Русский", "ru")
+        self.language_combo.addItem("English", "en")
+        self._choice_row(appearance_layout, self._t("language"), self.language_combo)
+        body.addWidget(appearance_card)
+
+        display_card, display_layout = self._card(self._t("display"))
+        self.speed_slider, self.speed_value = self._slider(display_layout, self._t("graph_speed"), 30, 180, "px/s")
+        self.avoid_trace_overlap = QCheckBox(self._t("avoid_trace_overlap"))
+        display_layout.addWidget(self.avoid_trace_overlap)
+        self.smooth_slider, self.smooth_value = self._slider(display_layout, self._t("smoothing"), 0, 200, self._t("milliseconds"))
+        self.opacity_slider, self.opacity_value = self._slider(display_layout, self._t("opacity"), 35, 100, "%")
+        self.steering_slider, self.steering_value = self._slider(display_layout, self._t("steering_lock"), 180, 1080, "°")
         rate_row = QHBoxLayout()
-        rate_row.addWidget(QLabel("Обновление / FPS"))
+        rate_row.addWidget(QLabel(self._t("update_rate")))
         rate_row.addStretch()
         self.rate_combo = QComboBox()
         for rate in (30, 60, 90, 120):
-            self.rate_combo.addItem(f"{rate} Гц · до {rate} FPS", rate)
+            self.rate_combo.addItem(self._t("rate_item", rate=rate), rate)
         rate_row.addWidget(self.rate_combo)
         display_layout.addLayout(rate_row)
         body.addWidget(display_card)
 
-        source_card, source_layout = self._card("ИСТОЧНИК И ОСИ")
+        source_card, source_layout = self._card(self._t("source_section"))
         source_row = QHBoxLayout()
-        source_row.addWidget(QLabel("Источник педалей и руля"))
+        source_row.addWidget(QLabel(self._t("source")))
         source_row.addStretch()
         self.source_combo = QComboBox()
-        self.source_combo.addItem("Телеметрия ACC", "acc")
-        self.source_combo.addItem("Руль / геймпад", "controller")
-        self.source_combo.addItem("Демо", "demo")
+        for source in ("acc", "controller", "demo"):
+            self.source_combo.addItem(self._t(source), source)
         source_row.addWidget(self.source_combo)
         source_layout.addLayout(source_row)
-        self.source_hint = QLabel("ACC считывает игровые значения; оси ниже нужны для прямого чтения контроллера.")
+        self.source_hint = QLabel(self._t("source_hint"))
         self.source_hint.setObjectName("hint")
         self.source_hint.setWordWrap(True)
         source_layout.addWidget(self.source_hint)
@@ -106,32 +127,32 @@ class SettingsDialog(QDialog):
         axes_layout.setContentsMargins(0, 5, 0, 0)
         axes_layout.setHorizontalSpacing(10)
         axes_layout.setVerticalSpacing(9)
-        axes_layout.addWidget(QLabel("Устройство"), 0, 0)
+        axes_layout.addWidget(QLabel(self._t("device")), 0, 0)
         self.device_combo = QComboBox()
         axes_layout.addWidget(self.device_combo, 0, 1)
-        refresh = QPushButton("Обновить")
+        refresh = QPushButton(self._t("refresh"))
         refresh.clicked.connect(lambda: self._refresh_devices())
         axes_layout.addWidget(refresh, 0, 2)
         self.axes: dict[str, QComboBox] = {}
         self.inverts: dict[str, QCheckBox] = {}
-        for row, (name, label) in enumerate((("gas", "Газ"), ("brake", "Тормоз"), ("steer", "Руль")), start=1):
-            axes_layout.addWidget(QLabel(label), row, 0)
+        for row, name in enumerate(("gas", "brake", "steer"), start=1):
+            axes_layout.addWidget(QLabel(self._t(name)), row, 0)
             combo = QComboBox()
             for axis, axis_name in enumerate(AXIS_NAMES):
                 combo.addItem(f"{axis_name} · ось {axis}", axis)
             axes_layout.addWidget(combo, row, 1)
             self.axes[name] = combo
-            invert = QCheckBox("Инверсия")
+            invert = QCheckBox(self._t("invert"))
             axes_layout.addWidget(invert, row, 2)
             self.inverts[name] = invert
         source_layout.addWidget(self.axes_panel)
         body.addWidget(source_card)
 
-        visibility_card, visibility_layout = self._card("ПОКАЗЫВАТЬ")
+        visibility_card, visibility_layout = self._card(self._t("visibility"))
         checks = QHBoxLayout()
-        self.show_steer = QCheckBox("Руль")
-        self.show_speed = QCheckBox("Скорость")
-        self.show_gear = QCheckBox("Передача")
+        self.show_steer = QCheckBox(self._t("steer"))
+        self.show_speed = QCheckBox(self._t("speed"))
+        self.show_gear = QCheckBox(self._t("gear"))
         for check in (self.show_steer, self.show_speed, self.show_gear):
             checks.addWidget(check)
         checks.addStretch()
@@ -139,14 +160,14 @@ class SettingsDialog(QDialog):
         body.addWidget(visibility_card)
 
         footer = QHBoxLayout()
-        reset = QPushButton("По умолчанию")
+        reset = QPushButton(self._t("defaults"))
         reset.clicked.connect(self._restore_defaults)
         footer.addWidget(reset)
         footer.addStretch()
-        cancel = QPushButton("Отмена")
+        cancel = QPushButton(self._t("cancel"))
         cancel.clicked.connect(self.reject)
         footer.addWidget(cancel)
-        save = QPushButton("Сохранить")
+        save = QPushButton(self._t("save"))
         save.setObjectName("primary")
         save.clicked.connect(self._accept)
         footer.addWidget(save)
@@ -156,6 +177,17 @@ class SettingsDialog(QDialog):
         self._load(settings)
         self.adjustSize()
         self._fit_height()
+
+    def _t(self, key: str, **values: object) -> str:
+        return tr(self.language, key, **values)
+
+    def _choice_row(self, layout: QVBoxLayout, title: str, combo: QComboBox) -> None:
+        row = QHBoxLayout()
+        row.addWidget(QLabel(title))
+        row.addStretch()
+        combo.setMinimumWidth(175)
+        row.addWidget(combo)
+        layout.addLayout(row)
 
     def _card(self, heading: str) -> tuple[QFrame, QVBoxLayout]:
         card = QFrame()
@@ -191,12 +223,12 @@ class SettingsDialog(QDialog):
         except Exception:
             devices = []
         if not devices:
-            self.device_combo.addItem("Устройство не найдено", "")
+            self.device_combo.addItem(self._t("no_device"), "")
         else:
             for guid, name in devices:
                 self.device_combo.addItem(name, guid)
         if selected_guid and selected_guid.isdecimal() and self.device_combo.findData(selected_guid) < 0:
-            self.device_combo.addItem("Ранее выбранное устройство (отключено)", selected_guid)
+            self.device_combo.addItem(self._t("old_device"), selected_guid)
         index = self.device_combo.findData(selected_guid)
         self.device_combo.setCurrentIndex(max(0, index))
         self._devices_scanned = True
@@ -204,7 +236,11 @@ class SettingsDialog(QDialog):
     def _load(self, settings: Settings) -> None:
         self._pending_guid = settings.controller_guid
         self._devices_scanned = False
+        self.wheel_combo.setCurrentIndex(self.wheel_combo.findData(settings.wheel_style))
+        self.info_combo.setCurrentIndex(self.info_combo.findData(settings.info_position))
+        self.language_combo.setCurrentIndex(self.language_combo.findData(settings.language))
         self.speed_slider.setValue(settings.graph_speed)
+        self.avoid_trace_overlap.setChecked(settings.avoid_trace_overlap)
         self.smooth_slider.setValue(settings.smoothing_ms)
         self.opacity_slider.setValue(settings.opacity)
         self.steering_slider.setValue(settings.steering_lock_deg)
@@ -213,14 +249,14 @@ class SettingsDialog(QDialog):
         self.source_combo.setCurrentIndex(self.source_combo.findData(settings.source))
         self.source_combo.blockSignals(False)
         self.device_combo.clear()
-        self.device_combo.addItem("Выберите режим руля для поиска устройства", settings.controller_guid)
+        self.device_combo.addItem(self._t("select_device"), settings.controller_guid)
         for name in ("gas", "brake", "steer"):
             combo = self.axes[name]
             while combo.count() > len(AXIS_NAMES):
                 combo.removeItem(len(AXIS_NAMES))
             index = getattr(settings, f"{name}_axis")
             if combo.findData(index) < 0:
-                combo.addItem(f"Ось {index} недоступна в WinMM", index)
+                combo.addItem(self._t("axis_unavailable", index=index), index)
             combo.setCurrentIndex(combo.findData(index))
             self.inverts[name].setChecked(getattr(settings, f"invert_{name}"))
         self.show_steer.setChecked(settings.show_steer)
@@ -251,6 +287,7 @@ class SettingsDialog(QDialog):
         self.result_settings = replace(
             self.result_settings,
             graph_speed=self.speed_slider.value(),
+            avoid_trace_overlap=self.avoid_trace_overlap.isChecked(),
             smoothing_ms=self.smooth_slider.value(),
             opacity=self.opacity_slider.value(),
             steering_lock_deg=self.steering_slider.value(),
@@ -266,5 +303,8 @@ class SettingsDialog(QDialog):
             show_steer=self.show_steer.isChecked(),
             show_speed=self.show_speed.isChecked(),
             show_gear=self.show_gear.isChecked(),
+            wheel_style=self.wheel_combo.currentData(),
+            info_position=self.info_combo.currentData(),
+            language=self.language_combo.currentData(),
         )
         self.accept()
