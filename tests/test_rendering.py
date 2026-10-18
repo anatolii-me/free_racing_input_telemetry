@@ -115,6 +115,12 @@ class OverlayRenderingTests(unittest.TestCase):
         dialog.safe_slider.setValue(24)
         dialog.avoid_trace_overlap.setChecked(True)
         dialog.show_pedal_values.setChecked(False)
+        dialog.show_info_bar.setChecked(False)
+        dialog.show_history.setChecked(False)
+        dialog.show_gas.setChecked(False)
+        dialog.show_brake.setChecked(False)
+        dialog.forza_port.setValue(5301)
+        dialog.f1_port.setValue(20778)
         dialog._accept()
         self.assertEqual((dialog.result_settings.wheel_style,
                           dialog.result_settings.info_position,
@@ -122,6 +128,13 @@ class OverlayRenderingTests(unittest.TestCase):
         self.assertTrue(dialog.result_settings.avoid_trace_overlap)
         self.assertEqual(dialog.result_settings.safe_inset, 24)
         self.assertFalse(dialog.result_settings.show_pedal_values)
+        self.assertFalse(dialog.result_settings.show_info_bar)
+        self.assertFalse(dialog.result_settings.show_history)
+        self.assertFalse(dialog.result_settings.show_gas)
+        self.assertFalse(dialog.result_settings.show_brake)
+        self.assertEqual(dialog.result_settings.forza_port, 5301)
+        self.assertEqual(dialog.result_settings.f1_port, 20778)
+        self.assertEqual(dialog.result_settings.source, "game")
         dialog.close()
 
     def test_safe_area_and_separators_share_one_spacing_rule(self) -> None:

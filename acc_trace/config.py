@@ -19,7 +19,9 @@ class Settings:
     avoid_trace_overlap: bool = False
     smoothing_ms: int = 65
     opacity: int = 94  # percent, applied to the whole overlay
-    source: str = "acc"  # acc, controller, demo
+    source: str = "game"  # game, controller, demo
+    forza_port: int = 5300
+    f1_port: int = 20777
     controller_guid: str = ""
     gas_axis: int = 2
     brake_axis: int = 3
@@ -31,11 +33,15 @@ class Settings:
     wheel_style: str = "formula"  # formula, sport, classic
     safe_inset: int = 16  # inner padding around the overlay content, in pixels
     info_position: str = "top"  # top, bottom
+    show_info_bar: bool = True
     language: str = "ru"  # ru, en
     steering_lock_deg: int = 540  # total lock-to-lock rotation of the wheel icon
     show_speed: bool = True
     show_gear: bool = True
     show_pedal_values: bool = True
+    show_history: bool = True
+    show_gas: bool = True
+    show_brake: bool = True
     x: int | None = None
     y: int | None = None
 
@@ -46,6 +52,8 @@ class Settings:
             raw = json.loads(path.read_text(encoding="utf-8"))
             known = {field.name for field in fields(cls)}
             values = {key: value for key, value in raw.items() if key in known}
+            if values.get("source") in ("auto", "acc", "iracing"):
+                values["source"] = "game"
             result = cls(**values)
             result.validate()
             return result
@@ -68,8 +76,12 @@ class Settings:
         self.opacity = max(35, min(100, int(self.opacity)))
         self.steering_lock_deg = max(180, min(1080, int(self.steering_lock_deg)))
         self.safe_inset = max(8, min(30, int(self.safe_inset)))
-        if self.source not in ("acc", "controller", "demo"):
-            self.source = "acc"
+        if self.source in ("auto", "acc", "iracing"):
+            self.source = "game"
+        if self.source not in ("game", "controller", "demo"):
+            self.source = "game"
+        self.forza_port = max(1024, min(65535, int(self.forza_port)))
+        self.f1_port = max(1024, min(65535, int(self.f1_port)))
         if self.wheel_style not in ("formula", "sport", "classic"):
             self.wheel_style = "formula"
         if self.info_position not in ("top", "bottom"):

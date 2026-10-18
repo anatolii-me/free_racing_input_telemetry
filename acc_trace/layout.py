@@ -22,11 +22,11 @@ class OverlayLayout:
     safe: QRectF
     wheel: QRectF | None
     drive: QRectF | None
-    chart_column: QRectF
-    chart: QRectF
-    pedals: QRectF
-    gas_track: QRectF
-    brake_track: QRectF
+    chart_column: QRectF | None
+    chart: QRectF | None
+    pedals: QRectF | None
+    gas_track: QRectF | None
+    brake_track: QRectF | None
     dividers: tuple[float, ...]
     wheel_size: float
     rail_y: float
@@ -48,13 +48,19 @@ def build_layout(settings: Settings) -> OverlayLayout:
         sections.append(("wheel", wheel_width))
     if drive_width:
         sections.append(("drive", drive_width))
-    sections.extend((("chart", chart_width), ("pedals", PEDALS_WIDTH)))
-    width = 2 * inset + sum(section_width for _, section_width in sections) + GAP * (len(sections) - 1)
-    safe = QRectF(inset, inset, width - 2 * inset, safe_height)
+    if settings.show_history:
+        sections.append(("chart", chart_width))
+    pedal_width = PEDALS_WIDTH if settings.show_gas and settings.show_brake else 36
+    if settings.show_gas or settings.show_brake:
+        sections.append(("pedals", pedal_width))
+    content_width = sum(section_width for _, section_width in sections) + GAP * max(0, len(sections) - 1)
+    safe_width = max(96, content_width)
+    width = 2 * inset + safe_width
+    safe = QRectF(inset, inset, safe_width, safe_height)
 
     rects: dict[str, QRectF] = {}
     dividers: list[float] = []
-    x = float(inset)
+    x = float(inset + (safe_width - content_width) / 2)
     for index, (name, section_width) in enumerate(sections):
         rects[name] = QRectF(x, inset, section_width, safe_height)
         x += section_width
@@ -62,19 +68,30 @@ def build_layout(settings: Settings) -> OverlayLayout:
             dividers.append(x + GAP / 2)
             x += GAP
 
-    chart_column = rects["chart"]
-    if settings.info_position == "top":
-        chart = QRectF(chart_column.left(), safe.top() + RAIL_HEIGHT,
-                       chart_column.width(), safe.height() - RAIL_HEIGHT)
+    chart_column = rects.get("chart")
+    if not settings.show_info_bar:
+        chart = QRectF(chart_column) if chart_column is not None else None
+        rail_y = safe.top() + 12 if settings.info_position == "top" else safe.bottom() - 12
+    elif settings.info_position == "top":
+        chart = (QRectF(chart_column.left(), safe.top() + RAIL_HEIGHT,
+                        chart_column.width(), safe.height() - RAIL_HEIGHT)
+                 if chart_column is not None else None)
         rail_y = safe.top() + 8
     else:
-        chart = QRectF(chart_column.left(), safe.top(),
-                       chart_column.width(), safe.height() - RAIL_HEIGHT)
+        chart = (QRectF(chart_column.left(), safe.top(),
+                        chart_column.width(), safe.height() - RAIL_HEIGHT)
+                 if chart_column is not None else None)
         rail_y = safe.bottom() - 8
 
-    pedals = rects["pedals"]
-    gas_track = QRectF(pedals.left() + 2, safe.top(), 32, safe.height())
-    brake_track = QRectF(pedals.right() - 34, safe.top(), 32, safe.height())
+    pedals = rects.get("pedals")
+    gas_track = None
+    brake_track = None
+    if pedals is not None:
+        if settings.show_gas:
+            gas_track = QRectF(pedals.left() + 2, safe.top(), 32, safe.height())
+        if settings.show_brake:
+            brake_track = QRectF(pedals.right() - 34, safe.top(), 32, safe.height())
+    controls_right = chart_column.right() if chart_column is not None else safe.right()
     return OverlayLayout(
         width=width, height=HEIGHT, safe=safe,
         wheel=rects.get("wheel"), drive=rects.get("drive"),
@@ -84,6 +101,6 @@ def build_layout(settings: Settings) -> OverlayLayout:
         wheel_size=min(wheel_width / .94, safe_height / .94)
         * (.94 if settings.wheel_style == "formula" else 1),
         rail_y=rail_y,
-        settings_button=QRectF(chart_column.right() - 49, rail_y - 10, 21, 20),
-        close_button=QRectF(chart_column.right() - 24, rail_y - 10, 21, 20),
+        settings_button=QRectF(controls_right - 49, rail_y - 10, 21, 20),
+        close_button=QRectF(controls_right - 24, rail_y - 10, 21, 20),
     )

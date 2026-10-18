@@ -115,6 +115,26 @@ class ControllerReader:
         self._known = {device.identifier: device for device in found}
         return [(device.identifier, device.name) for device in found]
 
+    def axis_samples(self, identifier: str = "") -> dict[str, dict[int, float]]:
+        """Normalized snapshots for axis learning; an empty id checks every device."""
+        backend = self._backend()
+        if backend is None:
+            return {}
+        self.devices()
+        result: dict[str, dict[int, float]] = {}
+        for device in self._known.values():
+            if identifier and identifier != device.identifier:
+                continue
+            raw = backend.read_raw(int(device.identifier))
+            if raw is None:
+                continue
+            result[device.identifier] = {
+                index: clamp((raw[index] - device.ranges[index][0]) /
+                             max(1, device.ranges[index][1] - device.ranges[index][0]), 0, 1)
+                for index in device.available_axes
+            }
+        return result
+
     def close(self) -> None:
         # WinMM polling holds no acquisition or device handle.
         self._known.clear()
@@ -135,7 +155,8 @@ class ControllerReader:
             return Telemetry(speed_kmh=acc.speed_kmh, gear=acc.gear, label="РУЛЬ: ТОЛЬКО WINDOWS")
         device = self._selected(settings.controller_guid)
         if device is None:
-            return Telemetry(speed_kmh=acc.speed_kmh, gear=acc.gear, label="ОЖИДАНИЕ РУЛЯ")
+            label = "ОЖИДАНИЕ ИГРЫ / РУЛЯ" if settings.source == "auto" else "ОЖИДАНИЕ РУЛЯ"
+            return Telemetry(speed_kmh=acc.speed_kmh, gear=acc.gear, label=label)
         raw = backend.read_raw(int(device.identifier))
         if raw is None:
             self._known.clear()
@@ -156,3 +177,31 @@ class ControllerReader:
         steer = -axis(settings.steer_axis) if settings.invert_steer else axis(settings.steer_axis)
         return Telemetry(gas, brake, steer, acc.speed_kmh, acc.gear, True,
                          "РУЛЬ · LIVE", acc.connected)
+
+
+class AxisDetector:
+    """Select a dominant intentional movement above the resting baseline."""
+
+    def __init__(self, baseline: dict[str, dict[int, float]]) -> None:
+        self.baseline = baseline
+        self._candidate: tuple[str, int] | None = None
+        self._stable = 0
+
+    def feed(self, samples: dict[str, dict[int, float]]) -> tuple[str, int, bool] | None:
+        changes: list[tuple[float, str, int, bool]] = []
+        for device_id, axes in samples.items():
+            for index, value in axes.items():
+                start = self.baseline.get(device_id, {}).get(index)
+                if start is not None:
+                    delta = value - start
+                    changes.append((abs(delta), device_id, index, delta < 0))
+        changes.sort(reverse=True)
+        if not changes or changes[0][0] < .22 or (len(changes) > 1 and changes[0][0] < changes[1][0] * 1.5):
+            self._candidate = None
+            self._stable = 0
+            return None
+        _, device_id, index, inverted = changes[0]
+        candidate = (device_id, index)
+        self._stable = self._stable + 1 if candidate == self._candidate else 1
+        self._candidate = candidate
+        return (device_id, index, inverted) if self._stable >= 2 else None

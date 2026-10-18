@@ -22,8 +22,9 @@ class Telemetry:
     speed_kmh: float = 0.0
     gear: int = 1  # ACC: 0=R, 1=N, 2=1, ...
     connected: bool = False
-    label: str = "ОЖИДАНИЕ ACC"
+    label: str = "ОЖИДАНИЕ AC / ACC"
     vehicle_available: bool = False
+    gear_text: str | None = None
 
 
 def clamp(value: float, low: float, high: float) -> float:
@@ -41,13 +42,16 @@ def parse_physics(data: bytes) -> tuple[int, Telemetry]:
         speed_kmh=clamp(speed, 0, 999),
         gear=gear,
         connected=True,
-        label="ACC · LIVE",
+        label="AC / ACC · LIVE",
         vehicle_available=True,
     )
 
 
 class AccReader:
-    def __init__(self) -> None:
+    def __init__(self, map_name: str = r"Local\acpmf_physics",
+                 waiting_label: str = "ОЖИДАНИЕ AC / ACC") -> None:
+        self.map_name = map_name
+        self.waiting_label = waiting_label
         self._map: mmap.mmap | None = None
         self._last_packet: int | None = None
         self._last_change = 0.0
@@ -57,6 +61,9 @@ class AccReader:
         if self._map is not None:
             self._map.close()
             self._map = None
+
+    def _parse(self, data: bytes) -> tuple[int, Telemetry]:
+        return parse_physics(data)
 
     def read(self) -> Telemetry:
         now = time.monotonic()
@@ -70,30 +77,30 @@ class AccReader:
                 kernel32.OpenFileMappingW.argtypes = (ctypes.c_uint32, ctypes.c_int, ctypes.c_wchar_p)
                 kernel32.OpenFileMappingW.restype = ctypes.c_void_p
                 kernel32.CloseHandle.argtypes = (ctypes.c_void_p,)
-                handle = kernel32.OpenFileMappingW(0x0004, 0, r"Local\acpmf_physics")
+                handle = kernel32.OpenFileMappingW(0x0004, 0, self.map_name)
                 if not handle:
                     raise OSError("ACC mapping is unavailable")
                 kernel32.CloseHandle(handle)
-                self._map = mmap.mmap(-1, PHYSICS_HEAD.size, tagname=r"Local\acpmf_physics", access=mmap.ACCESS_READ)
+                self._map = mmap.mmap(-1, PHYSICS_HEAD.size, tagname=self.map_name, access=mmap.ACCESS_READ)
             except (OSError, ValueError):
                 self._retry_at = now + 1.0
         if self._map is None:
-            return Telemetry()
+            return Telemetry(label=self.waiting_label)
         try:
             self._map.seek(0)
-            packet, sample = parse_physics(self._map.read(PHYSICS_HEAD.size))
+            packet, sample = self._parse(self._map.read(PHYSICS_HEAD.size))
             if packet != self._last_packet:
                 self._last_packet = packet
                 self._last_change = now
             if packet <= 0 or now - self._last_change > 2.0:
                 self.close()
                 self._retry_at = now + 1.0
-                return Telemetry()
+                return Telemetry(label=self.waiting_label)
             return sample
         except (OSError, ValueError, struct.error):
             self.close()
             self._retry_at = now + 1.0
-            return Telemetry()
+            return Telemetry(label=self.waiting_label)
 
 
 class DemoReader:

@@ -10,6 +10,11 @@ from PySide6.QtWidgets import QWidget
 
 from .config import Settings
 from .telemetry import AccReader, DemoReader, Telemetry
+from .iracing import IracingReader
+from .forza import ForzaReader
+from .f1_25 import F125Reader
+from .lmu import LmuReader
+from .evo import EvoReader
 from .controller import ControllerReader
 from .i18n import status_label, tr
 from .layout import OverlayLayout, build_layout
@@ -67,6 +72,11 @@ class Overlay(QWidget):
         self.settings = settings
         self.setWindowOpacity(settings.opacity / 100)
         self.acc_reader = AccReader()
+        self.evo_reader = EvoReader(settings.steering_lock_deg)
+        self.iracing_reader = IracingReader()
+        self.lmu_reader = LmuReader()
+        self.forza_reader = ForzaReader(settings.forza_port)
+        self.f1_reader = F125Reader(settings.f1_port)
         self.controller_reader = ControllerReader()
         self.demo_reader = DemoReader()
         self.current = Telemetry()
@@ -77,6 +87,7 @@ class Overlay(QWidget):
         self._drag_offset: QPoint | None = None
         self._hover_settings = False
         self._hover_close = False
+        self._pointer_inside = False
         self.timer = QTimer(self)
         self.timer.setTimerType(Qt.PreciseTimer)
         self.timer.setSingleShot(True)
@@ -89,9 +100,12 @@ class Overlay(QWidget):
         self.settings = settings
         self._layout: OverlayLayout = build_layout(settings)
         self.setFixedSize(self._layout.width, self._layout.height)
+        self.forza_reader.configure(settings.forza_port)
+        self.f1_reader.configure(settings.f1_port)
+        self.evo_reader.configure(settings.steering_lock_deg)
         self._hover_settings = self._hover_close = False
         self.setWindowOpacity(settings.opacity / 100)
-        if settings.source != previous_source:
+        if settings.source != previous_source or not settings.show_history:
             self._history.clear()
             self._smooth_gas = self._smooth_brake = 0.0
         self._next_frame_at = time.monotonic() + 1 / settings.update_hz
@@ -102,22 +116,30 @@ class Overlay(QWidget):
         now = time.monotonic()
         dt = max(.001, min(.2, now - self._last_tick))
         self._last_tick = now
+        previous_label = self.current.label
         if self.settings.source == "demo":
             self.current = self.demo_reader.read()
+        elif self.settings.source == "controller":
+            self.current = self.controller_reader.read(self.settings, Telemetry())
         else:
-            acc = self.acc_reader.read()
-            self.current = acc if self.settings.source == "acc" else self.controller_reader.read(self.settings, acc)
+            self.current = self._read_game()
+
+        if self.current.label != previous_label:
+            self._history.clear()
+            self._smooth_gas = self._smooth_brake = 0.0
 
         if self.current.connected:
             tau = self.settings.smoothing_ms / 1000
             alpha = 1 if tau == 0 else 1 - math.exp(-dt / tau)
             self._smooth_gas += (self.current.gas - self._smooth_gas) * alpha
             self._smooth_brake += (self.current.brake - self._smooth_brake) * alpha
-            self._history.append((now, self._smooth_gas, self._smooth_brake))
+            if self.settings.show_history:
+                self._history.append((now, self._smooth_gas, self._smooth_brake))
         else:
             self._history.clear()
             self._smooth_gas = self._smooth_brake = 0.0
-        max_age = (self._layout.chart.width() - 13) / self.settings.graph_speed + .2
+        max_age = ((self._layout.chart.width() - 13) / self.settings.graph_speed + .2
+                   if self._layout.chart is not None else 0)
         while self._history and now - self._history[0][0] > max_age:
             self._history.popleft()
         self.update()  # polling frequency and paint FPS share one timer
@@ -127,8 +149,26 @@ class Overlay(QWidget):
             self._next_frame_at = time.monotonic() + period
         self.timer.start(max(1, math.ceil((self._next_frame_at - time.monotonic()) * 1000)))
 
+    def _read_game(self) -> Telemetry:
+        source = self.settings.source
+        if source == "acc":  # compatibility with old programmatic settings
+            return self.acc_reader.read()
+        if source == "iracing":
+            return self.iracing_reader.read()
+        for reader in (self.acc_reader, self.evo_reader, self.iracing_reader,
+                       self.lmu_reader, self.forza_reader, self.f1_reader):
+            sample = reader.read()
+            if sample.connected:
+                return sample
+        return Telemetry(label="ОЖИДАНИЕ ИГРЫ")
+
     def closeEvent(self, event) -> None:  # noqa: N802
         self.acc_reader.close()
+        self.evo_reader.close()
+        self.iracing_reader.close()
+        self.lmu_reader.close()
+        self.forza_reader.close()
+        self.f1_reader.close()
         self.controller_reader.close()
         super().closeEvent(event)
 
@@ -194,7 +234,9 @@ class Overlay(QWidget):
             middle = layout.safe.center().y()
             both = self.settings.show_gear and self.settings.show_speed
             if self.settings.show_gear:
-                gear = "—" if not self.current.vehicle_available else "R" if self.current.gear == 0 else "N" if self.current.gear == 1 else str(self.current.gear - 1)
+                gear = ("—" if not self.current.vehicle_available else
+                        self.current.gear_text if self.current.gear_text is not None else
+                        "R" if self.current.gear == 0 else "N" if self.current.gear == 1 else str(self.current.gear - 1))
                 center_y = (layout.safe.top() + middle) / 2 if both else middle
                 self._tight_center_text(p, gear, drive.center().x(), center_y,
                                         41, TEXT, QFont.Bold)
@@ -215,61 +257,87 @@ class Overlay(QWidget):
                            QPoint(round(drive.right() - 10), round(middle)))
 
         chart = layout.chart
-        p.setPen(Qt.NoPen)
-        p.setBrush(QColor("#172432"))
-        p.drawRoundedRect(chart, 9, 9)
-        p.save()
-        clip = QPainterPath()
-        clip.addRoundedRect(chart, 9, 9)
-        p.setClipPath(clip)
-        p.setPen(QPen(QColor("#2c3948"), 1))
-        for level in (.25, .5, .75):
-            y = chart.bottom() - 7 - level * (chart.height() - 14)
-            p.drawLine(QPoint(round(chart.left()), round(y)), QPoint(round(chart.right()), round(y)))
-        for fraction in (.25, .5, .75):
-            x = chart.left() + chart.width() * fraction
-            p.drawLine(QPoint(round(x), round(chart.top())), QPoint(round(x), round(chart.bottom())))
-        if len(self._history) > 1:
-            gas_path, brake_path = self._trace_paths(chart, time.monotonic())
-            p.setBrush(Qt.NoBrush)
-            # Draw both glows below both strokes. strokePath never fills the
-            # open histories with the chart's background brush.
-            for path, color in ((gas_path, GAS), (brake_path, BRAKE)):
-                glow = QColor(color)
-                glow.setAlpha(36)
-                p.strokePath(path, QPen(glow, 5, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
-            for path, color in ((gas_path, GAS), (brake_path, BRAKE)):
-                p.strokePath(path, QPen(color, 2.2, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
-        p.restore()
-        self._draw_bar(p, layout.gas_track, self.current.gas if self.current.connected else 0, GAS)
-        self._draw_bar(p, layout.brake_track, self.current.brake if self.current.connected else 0, BRAKE)
-        self._draw_info_rail(p)
+        if chart is not None:
+            p.setPen(Qt.NoPen)
+            p.setBrush(QColor("#172432"))
+            p.drawRoundedRect(chart, 9, 9)
+            p.save()
+            clip = QPainterPath()
+            clip.addRoundedRect(chart, 9, 9)
+            p.setClipPath(clip)
+            p.setPen(QPen(QColor("#2c3948"), 1))
+            for level in (.25, .5, .75):
+                y = chart.bottom() - 7 - level * (chart.height() - 14)
+                p.drawLine(QPoint(round(chart.left()), round(y)), QPoint(round(chart.right()), round(y)))
+            for fraction in (.25, .5, .75):
+                x = chart.left() + chart.width() * fraction
+                p.drawLine(QPoint(round(x), round(chart.top())), QPoint(round(x), round(chart.bottom())))
+            if len(self._history) > 1:
+                gas_path, brake_path = self._trace_paths(chart, time.monotonic())
+                p.setBrush(Qt.NoBrush)
+                for path, color in ((gas_path, GAS), (brake_path, BRAKE)):
+                    glow = QColor(color)
+                    glow.setAlpha(36)
+                    p.strokePath(path, QPen(glow, 5, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+                for path, color in ((gas_path, GAS), (brake_path, BRAKE)):
+                    p.strokePath(path, QPen(color, 2.2, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+            p.restore()
+        if layout.gas_track is not None:
+            self._draw_bar(p, layout.gas_track, self.current.gas if self.current.connected else 0, GAS)
+        if layout.brake_track is not None:
+            self._draw_bar(p, layout.brake_track, self.current.brake if self.current.connected else 0, BRAKE)
+        if self.settings.show_info_bar or self._pointer_inside:
+            self._draw_info_rail(p, floating=not self.settings.show_info_bar)
+        else:
+            self._draw_compact_status(p)
         p.end()
 
-    def _draw_info_rail(self, p: QPainter) -> None:
-        left = self._layout.chart_column.left()
+    def _rail_bounds(self) -> tuple[float, float]:
+        host = self._layout.chart_column or self._layout.safe
+        return host.left(), host.right()
+
+    def _draw_info_rail(self, p: QPainter, *, floating: bool = False) -> None:
+        left, right = self._rail_bounds()
         y = self._info_y()
+        width = right - left
+        if floating or self._layout.chart_column is None:
+            p.setPen(Qt.NoPen)
+            p.setBrush(QColor(17, 27, 39, 225))
+            p.drawRoundedRect(QRectF(left + 1, y - 11, width - 2, 22), 6, 6)
         status_color = GAS if self.current.connected else MUTED
         p.setPen(Qt.NoPen)
         p.setBrush(status_color)
-        p.drawEllipse(QRectF(left, y - 3, 6, 6))
+        dot_x = left + (7 if floating or self._layout.chart_column is None else 0)
+        p.drawEllipse(QRectF(dot_x, y - 3, 6, 6))
         p.setFont(font(8, QFont.DemiBold))
         p.setPen(QColor("#d6e0e9"))
         label = status_label(self.settings.language, self.current.label)
-        label = QFontMetrics(p.font()).elidedText(label, Qt.ElideRight, 112)
-        p.drawText(QPoint(round(left + 12), round(y + 4)), label)
-        p.setPen(Qt.NoPen)
-        p.setBrush(GAS)
-        p.drawEllipse(QRectF(left + 132, y - 3, 6, 6))
-        self._label(p, tr(self.settings.language, "gas").upper(), left + 142, y + 4, 8, GAS, QFont.DemiBold)
-        p.setBrush(BRAKE)
-        p.drawEllipse(QRectF(left + 180, y - 3, 6, 6))
-        self._label(p, tr(self.settings.language, "brake").upper(), left + 190, y + 4, 8, BRAKE, QFont.DemiBold)
-        self._label(p, f"{self.settings.update_hz} FPS", left + 248, y + 4, 8, MUTED, QFont.DemiBold)
-        self._label(p, f"{self.settings.graph_speed} PX/S", left + 297, y + 4, 8, MUTED, QFont.DemiBold)
+        label_limit = min(112, max(0, width - 85))
+        if label_limit >= 20:
+            label = QFontMetrics(p.font()).elidedText(label, Qt.ElideRight, round(label_limit))
+            p.drawText(QPoint(round(dot_x + 12), round(y + 4)), label)
+        if width >= 300:
+            p.setPen(Qt.NoPen)
+            p.setBrush(GAS)
+            p.drawEllipse(QRectF(left + 132, y - 3, 6, 6))
+            self._label(p, tr(self.settings.language, "gas").upper(), left + 142, y + 4, 8, GAS, QFont.DemiBold)
+            p.setBrush(BRAKE)
+            p.drawEllipse(QRectF(left + 180, y - 3, 6, 6))
+            self._label(p, tr(self.settings.language, "brake").upper(), left + 190, y + 4, 8, BRAKE, QFont.DemiBold)
+        if width >= 390:
+            self._label(p, f"{self.settings.update_hz} FPS", left + 248, y + 4, 8, MUTED, QFont.DemiBold)
+            self._label(p, f"{self.settings.graph_speed} PX/S", left + 297, y + 4, 8, MUTED, QFont.DemiBold)
         settings_rect, close_rect = self._controls()
         self._draw_control(p, settings_rect, "settings", self._hover_settings)
         self._draw_control(p, close_rect, "close", self._hover_close)
+
+    def _draw_compact_status(self, p: QPainter) -> None:
+        left, _right = self._rail_bounds()
+        dot_y = self._layout.rail_y
+        color = GAS if self.current.connected else MUTED
+        p.setPen(QPen(QColor("#172432"), 2))
+        p.setBrush(color)
+        p.drawEllipse(QRectF(left + 8, dot_y - 4, 8, 8))
 
     def _trace_paths(self, chart: QRectF, now: float) -> tuple[QPainterPath, QPainterPath]:
         gas_path = QPainterPath()
@@ -336,9 +404,10 @@ class Overlay(QWidget):
     def mousePressEvent(self, event) -> None:  # noqa: N802
         if event.button() == Qt.LeftButton:
             settings_rect, close_rect = self._controls()
-            if settings_rect.contains(event.position()):
+            controls_visible = self.settings.show_info_bar or self._pointer_inside
+            if controls_visible and settings_rect.contains(event.position()):
                 self.settings_requested.emit()
-            elif close_rect.contains(event.position()):
+            elif controls_visible and close_rect.contains(event.position()):
                 self.close_requested.emit()
             else:
                 self._drag_offset = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
@@ -347,6 +416,9 @@ class Overlay(QWidget):
         settings_rect, close_rect = self._controls()
         hover_settings = settings_rect.contains(event.position())
         hover_close = close_rect.contains(event.position())
+        if not self._pointer_inside:
+            self._pointer_inside = True
+            self.update()
         if (hover_settings, hover_close) != (self._hover_settings, self._hover_close):
             self._hover_settings, self._hover_close = hover_settings, hover_close
             self.setCursor(Qt.PointingHandCursor if hover_settings or hover_close else Qt.OpenHandCursor)
@@ -360,12 +432,15 @@ class Overlay(QWidget):
             self.position_changed.emit(self.x(), self.y())
 
     def enterEvent(self, event) -> None:  # noqa: N802
+        self._pointer_inside = True
         self.setCursor(Qt.OpenHandCursor)
+        self.update()
 
     def leaveEvent(self, event) -> None:  # noqa: N802
+        self._pointer_inside = False
         if self._hover_settings or self._hover_close:
             self._hover_settings = self._hover_close = False
-            self.update()
+        self.update()
 
     def contextMenuEvent(self, event) -> None:  # noqa: N802
         self.context_menu_requested.emit(event.globalPos())
