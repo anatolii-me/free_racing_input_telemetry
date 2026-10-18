@@ -1,20 +1,20 @@
 # ACC Trace
 
-**See your racing inputs at a glance.** ACC Trace is a free, compact telemetry overlay for Windows. It shows a live throttle and brake history, steering input, speed, and gear without taking focus from the game. Use it while driving or add it to an OBS recording or stream.
+**See your racing inputs at a glance.** ACC Trace is a free, compact telemetry overlay for Windows. It shows a live throttle and brake history, steering input, speed, and gear. Use it while driving or add it to an OBS recording or stream.
 
 <p align="center">
   <img src="docs/overlay-en.png" alt="ACC Trace overlay in English">
 </p>
 
-## See it on track
+## Example of use in ACC
 
 <p align="center">
   <img src="docs/example_gif.gif" alt="ACC Trace overlay during gameplay">
 </p>
 
-The overlay works over windowed and borderless games. You can drag it into place, choose which elements to show, and switch between three wheel designs.
+The overlay works over windowed and borderless games. You can drag it into place, choose which elements to show, and switch between three wheel designs. Unwanted data can be hidden, for instance, you could keep only a minimalist input history graph to help you learn trail braking.
 
-**Three wheel presets, turning through a seamless chicane loop:**
+**Three wheel presets in the same style**
 
 <p align="center">
    <img src="docs/wheel-presets.gif" alt="Formula, sport, and classic steering wheel presets turning through a chicane" width="180">
@@ -22,15 +22,15 @@ The overlay works over windowed and borderless games. You can drag it into place
 
 ## Download for Windows
 
-[Download the latest portable Windows ZIP](https://github.com/anatolii-me/free_racing_input_telemetry/releases/latest/download/ACC-Trace-Windows-Portable.zip). Extract the whole ZIP to a folder you can write to, then run `ACC-Trace.exe`. Keep the `_internal` folder beside the EXE. You do not need to install Python.
+[Download the latest portable Windows ZIP](https://github.com/anatolii-me/free_racing_input_telemetry/releases/latest/download/ACC-Trace-Windows-Portable.zip). **Extract** the contents of the archive to your preferred folder, then run `ACC-Trace.exe`. **Keep** the `_internal` folder beside the EXE.
 
-Portable settings are saved as `settings.json` beside the EXE. To update, quit ACC Trace from the system tray and extract the new ZIP into the same folder, keeping `settings.json`.
+**Settings** are saved as `settings.json` beside the EXE. To update, quit ACC Trace from the system tray and extract the new ZIP into the same folder, **keeping** `settings.json`.
 
 The portable EXE is currently unsigned, so Windows may show a SmartScreen warning on first launch. Check that the ZIP came from this repository's Releases page before deciding whether to run it.
 
 ## Run from source
 
-1. Install [Python for Windows](https://www.python.org/downloads/windows/) if you do not have it.
+1. Install [Python for Windows](https://www.python.org/downloads/windows/) if you doтn't have it.
 2. In this project folder, run:
 
    ```powershell
@@ -49,6 +49,8 @@ Want to preview the overlay without a game? Run `.\.venv\Scripts\python.exe -m a
 
 **Verified, works** means tested with a live game. **Expected to work, not tested in game** means the adapter has been checked with sample data or local packets, but has not yet been confirmed in a live session. **Compatibility not added** means there is no game telemetry adapter yet.
 
+For any game without an adapter, **Device** mode can still show throttle, brake, and steering from a wheel or gamepad that Windows exposes through WinMM. Speed and gear need supported game telemetry, they are unavailable in Device mode.
+
 | Game | Game telemetry status |
 | --- | --- |
 | Assetto Corsa | **Verified, works** |
@@ -65,8 +67,6 @@ Want to preview the overlay without a game? Run `.\.venv\Scripts\python.exe -m a
 | BeamNG.drive | **Compatibility not added yet** |
 | rFactor 2 and RaceRoom Racing Experience | **Compatibility not added yet** |
 | Forza Motorsport and F1 24 | **Compatibility not added yet** |
-
-For any game without an adapter, **Device** mode can still show throttle, brake, and steering from a wheel or gamepad that Windows exposes through WinMM. Speed and gear need supported game telemetry; they are unavailable in Device mode.
 
 ### Where the data comes from
 
@@ -96,7 +96,7 @@ If you change a UDP port in ACC Trace, use the same port in the game. If Forza d
 | --- | --- |
 | **Input tracking** | Choose automatic game telemetry, a wheel/gamepad, or generated demo data. |
 | **Wheel style** | Choose Formula, Sport wheel, or Classic wheel. |
-| **Wheel rotation, lock to lock** | Match the on-screen wheel movement to your car's steering range. For example, 540° means 270° each way from center. |
+| **Wheel rotation, lock to lock** | Match the on-screen wheel movement to your car's steering range. For example, 540° means 270° each way from center. This value should match the value in your driver and/or game. |
 | **Graph speed** | Set how quickly the input history moves across the overlay. |
 | **Smoothing** | Soften sudden changes in the throttle and brake traces. Lower values respond faster. |
 | **Separate overlapping traces** | Move matching throttle and brake lines slightly apart so both remain visible. |
