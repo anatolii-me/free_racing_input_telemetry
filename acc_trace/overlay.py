@@ -60,8 +60,9 @@ class Overlay(QWidget):
     context_menu_requested = Signal(QPoint)
 
     def __init__(self, settings: Settings) -> None:
-        super().__init__(None, Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint |
-                         Qt.WindowDoesNotAcceptFocus | Qt.Tool)
+        # OBS Window Capture skips tool windows (WS_EX_TOOLWINDOW).
+        super().__init__(None, Qt.Window | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint |
+                         Qt.WindowDoesNotAcceptFocus)
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setAttribute(Qt.WA_Hover)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
