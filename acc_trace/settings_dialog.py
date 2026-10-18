@@ -23,6 +23,7 @@ QLabel#section { color: #9aabba; font-weight: 600; font-size: 11px; }
 QFrame#card { background: #1b2938; border: 1px solid #304152; border-radius: 13px; }
 QComboBox { background: #273747; border: 1px solid #405267; border-radius: 8px; padding: 6px 10px; min-height: 19px; color: #f3f6fb; }
 QComboBox QAbstractItemView { background: #233243; color: #f3f6fb; selection-background-color: #3a5265; }
+QSpinBox { background: #273747; border: 1px solid #405267; border-radius: 8px; padding: 6px 10px; min-height: 19px; color: #f3f6fb; }
 QPushButton { background: #293b4c; border: 1px solid #405267; border-radius: 8px; padding: 8px 14px; color: #edf3f9; }
 QPushButton:hover { background: #34495b; }
 QPushButton#primary { background: #83dfb1; border-color: #83dfb1; color: #102018; font-weight: 600; }
@@ -169,7 +170,7 @@ class SettingsDialog(QDialog):
             axes_layout.addWidget(QLabel(self._t(name)), row, 0)
             combo = QComboBox()
             for axis, axis_name in enumerate(AXIS_NAMES):
-                combo.addItem(f"{axis_name} · ось {axis}", axis)
+                combo.addItem(self._t("axis_number", name=axis_name, index=axis), axis)
             axes_layout.addWidget(combo, row, 1)
             self.axes[name] = combo
             learn = QPushButton(self._t("detect_axis"))

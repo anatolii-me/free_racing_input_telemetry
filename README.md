@@ -1,74 +1,121 @@
 # ACC Trace
 
-Компактный оверлей телеметрии для Windows. Показывает историю газа и тормоза, положение руля, скорость и передачу. В режиме «Игра» автоматически выбирает активную телеметрию Assetto Corsa / Assetto Corsa Competizione, Assetto Corsa EVO, iRacing, Le Mans Ultimate, Forza Horizon 4–6 или F1 25. В режиме «Устройство» читает подключённый руль или геймпад через WinMM. Работает поверх обычных окон и игры в оконном режиме или режиме без рамки.
+**See your racing inputs at a glance.** ACC Trace is a free, compact telemetry overlay for Windows. It shows a live throttle and brake history, steering input, speed, and gear without taking focus from the game. Use it while driving or add it to an OBS recording or stream.
 
-![Оверлей ACC Trace](docs/overlay.png)
+![ACC Trace overlay in English](docs/overlay-en.png)
 
-[Окно настроек](docs/settings.png) · [Переключатели отображения](docs/settings-visibility.png) · [Назначение осей](docs/settings-axes.png)
+## See it on track
 
-В настройках доступны три нарисованных в одном стиле руля: [штурвал](docs/overlay.png), [руль](docs/preview-sport.png) и [классический руль](docs/preview-classic.png). [Компактная панель без руля](docs/preview-compact.png) · [шкалы без процентов](docs/preview-no-values.png) · [подсказки и кнопки снизу](docs/preview-bottom-en.png) · [настройки на английском](docs/preview-settings-en.png).
+![ACC Trace overlay during gameplay](docs/example_gif.gif)
 
-## Запуск
+The overlay works over windowed and borderless games. You can drag it into place, choose which elements to show, and switch between three wheel designs.
 
-```powershell
-py -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe -m acc_trace
-```
+**Three wheel presets, turning through a seamless chicane loop:**
 
-После установки можно запускать двойным щелчком по `start.bat` — приложение откроется без окна консоли.
+<img src="docs/wheel-presets.gif" alt="Formula, sport, and classic steering wheel presets turning through a chicane" width="180">
 
-Для просмотра интерфейса без запущенной ACC:
+## Download for Windows
 
-```powershell
-.\.venv\Scripts\python.exe -m acc_trace --demo
-```
+[Download the latest portable Windows ZIP](https://github.com/anatolii-me/free_racing_input_telemetry/releases/latest/download/ACC-Trace-Windows-Portable.zip). Extract the whole ZIP to a folder you can write to, then run `ACC-Trace.exe`. Keep the `_internal` folder beside the EXE. You do not need to install Python.
 
-Запустите поддерживаемую игру и выйдите на трассу. Оверлей ищет `Local\acpmf_physics` для AC / ACC, `Local\acevo_pmf_physics` для AC EVO, `Local\IRSDKMemMapFileName` для iRacing и `LMU_Data` для LMU. Если в игре есть переключатель Shared Memory, включите его.
+Portable settings are saved as `settings.json` beside the EXE. To update, quit ACC Trace from the system tray and extract the new ZIP into the same folder, keeping `settings.json`. To bring settings from a Python installation, copy `%APPDATA%\ACC Trace\settings.json` beside the EXE before the first portable launch.
 
-Для **Forza Horizon 4–6** в настройках игры включите **Data Out** и выберите **Car Dash**, если игра предлагает выбор формата. Задайте IP этого компьютера (`127.0.0.1` или его сетевой IPv4‑адрес) и порт `5300`. Для **F1 25** включите **UDP Telemetry**, задайте тот же IP и порт `20777`. Поддерживаются форматы UDP **2025** и **2026 Season Pack**; оверлей определяет их по пакету. Оба порта можно изменить в настройках оверлея; каждый должен совпадать с портом в соответствующей игре. Если Forza не отправляет данные на `127.0.0.1`, укажите сетевой IPv4‑адрес компьютера в игре.
+The portable EXE is currently unsigned, so Windows may show a SmartScreen warning on first launch. Check that the ZIP came from this repository's Releases page before deciding whether to run it.
 
-При запуске панель не активирует своё окно и не забирает фокус у игры. Панель можно перетаскивать мышью; шестерня открывает настройки, крестик закрывает приложение. Строку статуса, легенды и кнопок можно расположить сверху или снизу либо скрыть. При скрытии график занимает всю высоту безопасной зоны, точка подключения остаётся видимой, а вся полупрозрачная строка появляется поверх графика при наведении. Внутренний отступ задаёт одинаковые поля вокруг содержимого. Историю, отдельные шкалы газа и тормоза, руль, скорость и передачу можно скрывать независимо; ширина панели подстраивается автоматически. Если видна только передача или только скорость, показатель располагается по центру без горизонтального разделителя. Проценты газа и тормоза можно скрыть в настройках. Правый щелчок по панели или значок в системном трее также открывают меню с настройками и выходом.
+## Run from source
 
-## Захват в OBS Studio
+1. Install [Python for Windows](https://www.python.org/downloads/windows/) if you do not have it.
+2. In this project folder, run:
 
-Запустите ACC Trace и добавьте в OBS источник **Захват окна**. В поле **Окно** выберите `ACC Trace` (при запуске через `start.bat` процесс может называться `pythonw.exe`). В поле **Метод захвата** вручную выберите **Современный (Windows Graphics Capture / WGC)**: режим **Автоматически** для окна Qt обычно выбирает BitBlt, который может показывать чёрный прямоугольник вместо прозрачного оверлея. Затем разместите этот источник **выше захвата игры** в списке источников сцены и проверьте результат в предпросмотре OBS и короткой пробной записи. Если WGC недоступен или тоже показывает чёрный фон либо пустой кадр, используйте **Захват экрана** для монитора с игрой и оверлеем; отдельный захват игры сам по себе не включает окна, нарисованные поверх неё.
+   ```powershell
+   py -m venv .venv
+   .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+   .\.venv\Scripts\python.exe -m acc_trace
+   ```
 
-После обновления приложения закройте старый экземпляр через значок в трее и запустите его заново, затем откройте свойства источника OBS для обновления списка окон. В эксклюзивном полноэкранном режиме обычный оверлей может не отображаться поверх игры; выберите оконный режим без рамки.
+3. Once setup is complete, you can launch ACC Trace with `start.bat` instead of a console.
 
-## Настройки по умолчанию
+Open **Settings** with the gear icon, set **Language** to **English**, and choose an input source. The default is **Game: detect automatically**. Start a supported game and drive onto the track.
 
-| Параметр | Значение |
+Want to preview the overlay without a game? Run `.\.venv\Scripts\python.exe -m acc_trace --demo`.
+
+## Game compatibility
+
+**Verified, works** means tested with a live game. **Expected to work, not tested in game** means the adapter has been checked with sample data or local packets, but has not yet been confirmed in a live session. **Compatibility not added** means there is no game telemetry adapter yet.
+
+| Game | Game telemetry status |
 | --- | --- |
-| Источник | Игра: AC / ACC → AC EVO → iRacing → LMU → FH4–6 → F1 25 |
-| Порт Forza Data Out | 5300 |
-| Порт F1 25 UDP | 20777 |
-| Частота опроса и предел FPS | 60 Гц / 60 FPS |
-| Скорость графика | 95 px/s |
-| Раздвигать линии при совпадении | Выключено |
-| Сглаживание | 65 мс |
-| Непрозрачность | 94% |
-| Поворот значка руля | 540° от упора до упора |
-| Вид руля | Штурвал |
-| Внутренний отступ | 16 px |
-| Подсказки и кнопки | Сверху |
-| Строка статуса, легенды и настроек | Показана |
-| Язык | Русский (доступен английский) |
-| Газ / тормоз / руль | Оси 2 / 3 / 0 (только режим контроллера) |
-| Инверсия | Выключена для всех осей |
-| История / газ / тормоз / руль / скорость / передача | Показаны |
-| Проценты газа и тормоза | Показаны внутри шкал |
+| Assetto Corsa (AC) | **Verified, works** |
+| Assetto Corsa Competizione (ACC) | **Verified, works** |
+| Forza Horizon 6 | **Verified, works** |
+| Assetto Corsa EVO | **Expected to work, not tested in game** |
+| iRacing | **Expected to work, not tested in game** |
+| Le Mans Ultimate | **Expected to work, not tested in game** |
+| Forza Horizon 4 and 5 | **Expected to work, not tested in game** |
+| F1 25 | **Expected to work, not tested in game** |
+| DiRT Rally 2.0 | **Compatibility not added** |
+| EA SPORTS WRC | **Compatibility not added** |
+| Automobilista 2 | **Compatibility not added** |
+| BeamNG.drive | **Compatibility not added** |
+| rFactor 2 and RaceRoom Racing Experience | **Compatibility not added** |
+| Forza Motorsport and F1 24 | **Compatibility not added** |
 
-В режиме **Игра** приложение проверяет игровые источники в порядке AC / ACC → AC EVO → iRacing → LMU → FH4–6 → F1 25 и показывает название подключённой игры в строке статуса, например `AC EVO · LIVE` или `F1 25 · LIVE`. В режиме **Устройство** педали и руль считываются через Windows WinMM без захвата устройства и команд обратной связи; скорость и передача в этом режиме недоступны. Доступны оси X, Y, Z, R, U и V. Для назначения выберите **Устройство**, нажмите **Определить** рядом с газом, тормозом или рулём, затем двигайте только нужную ось. Приложение выберет ось и устройство, а для педалей выставит инверсию по направлению нажатия. Если движение неоднозначно, назначьте ось вручную. Нумерация WinMM у разных рулей может отличаться. Демо-режим генерирует данные для проверки внешнего вида.
+For any game without an adapter, **Device** mode can still show throttle, brake, and steering from a wheel or gamepad that Windows exposes through WinMM. Speed and gear need supported game telemetry; they are unavailable in Device mode.
 
-Поддержка игр ограничена перечисленными интерфейсами общей памяти и UDP; другие симуляторы требуют отдельного адаптера. Прямое чтение устройства зависит от того, показывает ли его Windows как WinMM‑джойстик. AC, ACC и FH6 проверены пользователем в игре. Парсеры AC EVO, LMU, iRacing и F1 25 проверены синтетическими данными, а UDP‑приёмники — локальной отправкой пакетов; с живыми играми эти четыре адаптера пока не проверены.
+### Where the data comes from
 
-`steerAngle` в ACC нормализован от −1 до 1, поэтому угол поворота значка можно подстроить в настройках под виртуальный руль конкретного автомобиля. Значение 540° означает ±270° от центра.
+| Input source | Throttle, brake, steering | Speed and gear |
+| --- | --- | --- |
+| **Game** (default) | From the detected game's telemetry | From the detected game's telemetry |
+| **Device** | Directly from a Windows wheel or gamepad | Unavailable |
+| **Demo** | Generated sample data | Generated sample data |
 
-Настройки сохраняются в `%APPDATA%\ACC Trace\settings.json`. Частота опроса и отрисовка используют один таймер; фактическая частота может немного снижаться при нагрузке на систему. В эксклюзивном полноэкранном режиме Windows может не показывать поверх игры обычные окна: выберите в ACC режим без рамки.
+You can show or hide the throttle, brake, steering, speed, and gear displays independently. This changes the layout, not the source of the data. The current app does not combine game speed and gear with device axes in one session.
 
-Проверка отрисовки: `.\.venv\Scripts\python.exe -m unittest discover -s tests -v`.
+### Game setup
 
-## Источник формата данных
+- **AC, ACC, AC EVO, iRacing, and Le Mans Ultimate:** use **Game** mode. If the game has a shared memory option, enable it. ACC Trace looks for a running game automatically.
+- **Forza Horizon 4–6:** enable **Data Out** in the game and select **Car Dash** format if offered. Set the destination IP to `127.0.0.1` (or this PC's LAN IPv4 address) and port `5300`.
+- **F1 25:** enable **UDP Telemetry**. Set the destination IP to `127.0.0.1` (or this PC's LAN IPv4 address) and port `20777`. ACC Trace accepts the 2025 and 2026 Season Pack packet formats.
 
-Первые поля страницы физики соответствуют [документации AC](https://labs.assettocorsa.jp/documents/reference/shared_memory), [документации ACC Shared Memory v1.8.12](https://github.com/SolusDev-sys/CppAccSharedMemory/blob/main/ACCSharedMemoryDocumentationV1.8.12.pdf) и [примеру Physics.cs](https://github.com/heikowulf/ACCsharedmemory/blob/master/Physics.cs). Блок AC EVO и отличие угла руля сверены с [исследованием его общей памяти](https://github.com/albertowd/live-telemetry-evo/blob/develop/docs/SHARED_MEMORY.md). Формат iRacing взят из [заголовка SDK](https://github.com/meltingice/node-iracing/blob/master/lib/irsdk_defines.h). Формат FH Car Dash сверён с [разметкой пакета Horizon](https://github.com/shoal-rat/Horizon_FSD/blob/master/docs/telemetry_format.md), а поля LMU `LMU_Data` — с [описанием структур, перенесённым из игрового SDK](https://github.com/TinyPedal/pyLMUSharedMemory/blob/master/lmu_data.py). Пакеты F1 25 взяты из [спецификации EA для 2025](https://forums.ea.com/t5/s/tghpe58374/attachments/tghpe58374/f1-games-game-info-hub-en/61/4/Data%20Output%20from%20F1%2025%20v3.pdf) и [структур обновления 2026](https://github.com/P403n1x87/f1-packets/blob/main/data/spec.h).
+If you change a UDP port in ACC Trace, use the same port in the game. If Forza does not send to `127.0.0.1`, try the PC's LAN IPv4 address.
+
+## Settings, in plain English
+
+![Current settings screen in English](docs/settings-en.png)
+
+| Setting | What it changes |
+| --- | --- |
+| **Input tracking** | Choose automatic game telemetry, a wheel/gamepad, or generated demo data. |
+| **Wheel style** | Choose Formula, Sport wheel, or Classic wheel. |
+| **Wheel rotation, lock to lock** | Match the on-screen wheel movement to your car's steering range. For example, 540° means 270° each way from center. |
+| **Graph speed** | Set how quickly the input history moves across the overlay. |
+| **Smoothing** | Soften sudden changes in the throttle and brake traces. Lower values respond faster. |
+| **Separate overlapping traces** | Move matching throttle and brake lines slightly apart so both remain visible. |
+| **Refresh / FPS** | Set how often inputs are read and the overlay is redrawn. |
+| **Opacity** | Make the whole overlay more or less transparent. |
+| **Inner padding** | Adjust the space between the content and the panel edge. |
+| **Hints and controls** | Put the status, legend, and buttons at the top or bottom. The nearby checkbox hides this bar until you hover over it. |
+| **Show** | Hide individual bars, input history, wheel, speed, gear, or pedal percentages. The panel resizes to fit. |
+| **Forza / F1 port** | Match the UDP port set in that game. These fields appear in Game mode. |
+
+In **Device** mode, choose a wheel or gamepad and assign the **Gas**, **Brake**, and **Wheel** axes. Click **Detect**, then move only that pedal or wheel. Use **Invert** if the value moves backward. Device availability depends on what Windows exposes through WinMM. [View the Device settings screen](docs/settings-device-en.png).
+
+## Capture in OBS Studio
+
+1. Add **Window Capture** and select the `ACC Trace` window. When started with `start.bat`, the process may appear as `pythonw.exe`.
+2. Set the capture method to **Windows Graphics Capture (WGC)**. Automatic capture may choose BitBlt, which can show a black rectangle instead of the transparent overlay.
+3. Place the ACC Trace source above the game source. Check the OBS preview and make a short test recording.
+
+If Window Capture still fails, use **Display Capture** for the screen showing both the game and overlay. Ordinary overlays may not appear over exclusive fullscreen games, so use windowed or borderless mode. After updating ACC Trace, close the old instance from the system tray and refresh the window selection in OBS.
+
+## Notes
+
+- Source launches store settings in `%APPDATA%\ACC Trace\settings.json`; portable launches use the file beside the EXE.
+- Right-click the overlay or use its system tray icon to open Settings or quit.
+- Device mode only reads input. It does not take control of the wheel or change force feedback.
+- Run the tests with `.\.venv\Scripts\python.exe -m unittest discover -s tests -v`.
+
+The game adapters use the games' shared memory or UDP telemetry formats. See the [AC shared memory reference](https://labs.assettocorsa.jp/documents/reference/shared_memory), [ACC shared memory documentation](https://github.com/SolusDev-sys/CppAccSharedMemory/blob/main/ACCSharedMemoryDocumentationV1.8.12.pdf), [AC EVO mapping notes](https://github.com/albertowd/live-telemetry-evo/blob/develop/docs/SHARED_MEMORY.md), [iRacing SDK definitions](https://github.com/meltingice/node-iracing/blob/master/lib/irsdk_defines.h), [Forza Horizon Car Dash layout](https://github.com/shoal-rat/Horizon_FSD/blob/master/docs/telemetry_format.md), [LMU shared memory structures](https://github.com/TinyPedal/pyLMUSharedMemory/blob/master/lmu_data.py), and [F1 25 packet specification](https://forums.ea.com/t5/s/tghpe58374/attachments/tghpe58374/f1-games-game-info-hub-en/61/4/Data%20Output%20from%20F1%2025%20v3.pdf).
+
+To make a new portable ZIP on Windows, install `requirements.txt` and `requirements-build.txt` into `.venv`, then run `packaging\build_portable.ps1`. The archive appears in `dist`.

@@ -2,11 +2,16 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from dataclasses import asdict, dataclass, fields
 from pathlib import Path
 
 
 def settings_path() -> Path:
+    if getattr(sys, "frozen", False):
+        # The portable executable keeps its data in its own folder, not in
+        # PyInstaller's temporary extraction directory or the user's profile.
+        return Path(sys.executable).resolve().parent / "settings.json"
     base = Path(os.environ.get("APPDATA") or Path.home() / ".config")
     return base / "ACC Trace" / "settings.json"
 

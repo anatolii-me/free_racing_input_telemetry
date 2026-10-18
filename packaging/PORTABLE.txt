@@ -1,0 +1,12 @@
+ACC Trace portable for Windows
+
+1. Extract the entire ZIP to a folder you can write to.
+2. Run ACC-Trace.exe. Keep the _internal folder beside it.
+3. Settings are saved as settings.json beside ACC-Trace.exe.
+
+To update, close ACC Trace from the system tray, then copy the files from a
+new ZIP into the same folder. Keep your settings.json file.
+
+The Python source version uses %APPDATA%\ACC Trace\settings.json instead.
+To bring those settings to the portable build, copy that file beside the EXE
+before you launch it.

@@ -1,0 +1,15 @@
+Third-party software in ACC Trace portable
+
+This bundle includes Qt 6.12.0, PySide6-Essentials 6.12.0, and Shiboken6
+6.12.0 from The Qt Company. They are distributed here under the GNU Lesser
+General Public License version 3. Copies of LGPLv3 and its underlying GPLv3
+are included as LGPL-3.0.txt and GPL-3.0.txt.
+
+The Qt and PySide6 libraries are separate files inside the _internal folder.
+Their source code and licensing information are available from:
+https://code.qt.io/cgit/qt/
+https://code.qt.io/cgit/pyside/pyside-setup.git/
+https://www.qt.io/development/open-source-lgpl-obligations
+
+ACC Trace's own source code is available at:
+https://github.com/anatolii-me/free_racing_input_telemetry
