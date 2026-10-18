@@ -51,20 +51,20 @@ Want to preview the overlay without a game? Run `.\.venv\Scripts\python.exe -m a
 
 | Game | Game telemetry status |
 | --- | --- |
-| Assetto Corsa (AC) | **Verified, works** |
-| Assetto Corsa Competizione (ACC) | **Verified, works** |
+| Assetto Corsa | **Verified, works** |
+| Assetto Corsa Competizione | **Verified, works** |
+| F1 25 | **Verified, works** |
 | Forza Horizon 6 | **Verified, works** |
 | Assetto Corsa EVO | **Expected to work, not tested in game** |
 | iRacing | **Expected to work, not tested in game** |
 | Le Mans Ultimate | **Expected to work, not tested in game** |
 | Forza Horizon 4 and 5 | **Expected to work, not tested in game** |
-| F1 25 | **Expected to work, not tested in game** |
-| DiRT Rally 2.0 | **Compatibility not added** |
-| EA SPORTS WRC | **Compatibility not added** |
-| Automobilista 2 | **Compatibility not added** |
-| BeamNG.drive | **Compatibility not added** |
-| rFactor 2 and RaceRoom Racing Experience | **Compatibility not added** |
-| Forza Motorsport and F1 24 | **Compatibility not added** |
+| DiRT Rally 2.0 | **Compatibility not added yet** |
+| EA SPORTS WRC | **Compatibility not added yet** |
+| Automobilista 2 | **Compatibility not added yet** |
+| BeamNG.drive | **Compatibility not added yet** |
+| rFactor 2 and RaceRoom Racing Experience | **Compatibility not added yet** |
+| Forza Motorsport and F1 24 | **Compatibility not added yet** |
 
 For any game without an adapter, **Device** mode can still show throttle, brake, and steering from a wheel or gamepad that Windows exposes through WinMM. Speed and gear need supported game telemetry; they are unavailable in Device mode.
 
