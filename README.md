@@ -2,23 +2,29 @@
 
 **See your racing inputs at a glance.** ACC Trace is a free, compact telemetry overlay for Windows. It shows a live throttle and brake history, steering input, speed, and gear without taking focus from the game. Use it while driving or add it to an OBS recording or stream.
 
-![ACC Trace overlay in English](docs/overlay-en.png)
+<p align="center">
+  <img src="docs/overlay-en.png" alt="ACC Trace overlay in English">
+</p>
 
 ## See it on track
 
-![ACC Trace overlay during gameplay](docs/example_gif.gif)
+<p align="center">
+  <img src="docs/example_gif.gif" alt="ACC Trace overlay during gameplay">
+</p>
 
 The overlay works over windowed and borderless games. You can drag it into place, choose which elements to show, and switch between three wheel designs.
 
 **Three wheel presets, turning through a seamless chicane loop:**
 
-<img src="docs/wheel-presets.gif" alt="Formula, sport, and classic steering wheel presets turning through a chicane" width="180">
+<p align="center">
+   <img src="docs/wheel-presets.gif" alt="Formula, sport, and classic steering wheel presets turning through a chicane" width="180">
+</p>
 
 ## Download for Windows
 
 [Download the latest portable Windows ZIP](https://github.com/anatolii-me/free_racing_input_telemetry/releases/latest/download/ACC-Trace-Windows-Portable.zip). Extract the whole ZIP to a folder you can write to, then run `ACC-Trace.exe`. Keep the `_internal` folder beside the EXE. You do not need to install Python.
 
-Portable settings are saved as `settings.json` beside the EXE. To update, quit ACC Trace from the system tray and extract the new ZIP into the same folder, keeping `settings.json`. To bring settings from a Python installation, copy `%APPDATA%\ACC Trace\settings.json` beside the EXE before the first portable launch.
+Portable settings are saved as `settings.json` beside the EXE. To update, quit ACC Trace from the system tray and extract the new ZIP into the same folder, keeping `settings.json`.
 
 The portable EXE is currently unsigned, so Windows may show a SmartScreen warning on first launch. Check that the ZIP came from this repository's Releases page before deciding whether to run it.
 
@@ -82,7 +88,9 @@ If you change a UDP port in ACC Trace, use the same port in the game. If Forza d
 
 ## Settings, in plain English
 
-![Current settings screen in English](docs/settings-en.png)
+<p align="center">
+  <img src="docs/settings-en.png" alt="Current settings screen in English">
+</p>
 
 | Setting | What it changes |
 | --- | --- |
